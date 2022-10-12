@@ -1,4 +1,7 @@
-const NUM_EDGES: u64 = 100;
+const NUM_EDGES: u64 = 1;
+const NUM_ROUNDS: u64 = 5;
+
+use std::fmt;
 
 #[derive(Debug, Copy, Clone)]
 enum Color {
@@ -33,6 +36,7 @@ impl Player {
     }
 }
 
+#[derive(Debug)]
 struct Matchup {
     a: Player,
     b: Player,
@@ -55,6 +59,7 @@ impl Matchup {
     }
 }
 
+#[derive(Debug)]
 struct Game {
     edges: Vec<Matchup>
 }
@@ -65,14 +70,26 @@ impl Game {
         }
     }
 }
+impl fmt::Display for Game {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        for edge in &self.edges {
+            writeln!(f, "{} - {}", edge.a.points, edge.b.points)?;
+        }
+        Ok(())
+    }
+}
 
 fn main() {
-    (0..NUM_EDGES).map(|x| Matchup {
+    let edges = (0..NUM_EDGES).map(|_| Matchup {
         a: Player { points: 0, prev_response: false, color: Color::new_random() },
         b: Player { points: 0, prev_response: false, color: Color::new_random() },
-    }).collect::<Vec<_>>()
+    }).collect::<Vec<_>>();
 
-    let gaem = Game { edges: vec![
-        Matchup { a:  },
-    ] }
+    let mut gaem = Game { edges };
+    for epoch in 0..NUM_ROUNDS {
+        println!("steps: {epoch}");
+        gaem.play_round();
+
+        println!("{gaem}");
+    }
 }
