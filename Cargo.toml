@@ -7,3 +7,4 @@ edition = "2021"
 
 [dependencies]
 fastrand = "1.8.0"
+polars = "0.24.3"
