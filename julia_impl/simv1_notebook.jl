@@ -18,7 +18,7 @@ end
 using Plots
 
 # ╔═╡ f74d1aa9-02d8-43d0-b4c7-3093e3b198e7
-@bind N_PLAYERS_POWER html"<input type=range min=1 max=80>"
+@bind N_PLAYERS_POWER html"<input type=range min=1 max=80 value=50>"
 
 # ╔═╡ 7137a155-64e6-48d8-9aa6-2c158272d1cb
 begin
@@ -53,7 +53,7 @@ begin
 end
 
 # ╔═╡ cce178a7-aab3-47a9-9303-9482688dcee2
-@bind N_ITERS html"<input type=range min=0 max=100 name=N_ITERS>"
+@bind N_ITERS html"<input type=range min=0 max=100 name=N_ITERS value=30>"
 
 # ╔═╡ 148e0f77-eb00-4562-aa94-e3f2cb4586ae
 begin
@@ -67,12 +67,18 @@ begin
 		global matchups = matchups .|> play_match
 	end
 	final_scores = matchups
-
+	
 	# using Memoize
 	# @memoize recursive_sim(n_iter) = n_iter == 0 ? matchups : recursive_sim(n_iter-1) .|> play_match
 	# final_scores = recursive_sim(N_ITERS)
-	
-	histogram(final_scores |> Iterators.flatten .|> (p -> p.score), xlabel="score", ylabel="number of players", label="$(N_PLAYERS) random players, $(N_ITERS) rounds, no reshuffle")
+
+	scores = final_scores |> Iterators.flatten .|> (p -> p.score)
+	max_score = maximum(scores)
+	println("max score: $(max_score)")
+	plot = histogram(scores,
+		xlabel="score", ylabel="number of players", label="pattern bars", title="$(N_PLAYERS) random players, $(N_ITERS) rounds, no reshuffle",
+		bins=[0, 0.05, 0.1, 0.3, 0.55, 0.65, 0.7, 1, 1.05]*max_score)
+	histogram!(plot, scores, bins=50, label="granular plot", alpha=0.4)
 end
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
@@ -91,7 +97,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.8.0"
 manifest_format = "2.0"
-project_hash = "f4f0088c458249f0e510169fecac03da3a9ce42e"
+project_hash = "ca8ccb35183a46156182663e3d031923ad0ef12a"
 
 [[deps.ArgTools]]
 uuid = "0dad84c5-d112-42e6-8d28-ef12dabb789f"
@@ -1013,9 +1019,9 @@ version = "1.4.1+0"
 # ╔═╡ Cell order:
 # ╠═3ccedc11-19d9-47fc-9b0e-7cf4400264a7
 # ╠═f74d1aa9-02d8-43d0-b4c7-3093e3b198e7
-# ╠═7137a155-64e6-48d8-9aa6-2c158272d1cb
-# ╠═19bf098e-6635-4e45-9edc-9ae527c8c97d
-# ╠═1ba83e3d-a6f1-4b53-b5ac-a06344425504
+# ╟─7137a155-64e6-48d8-9aa6-2c158272d1cb
+# ╟─19bf098e-6635-4e45-9edc-9ae527c8c97d
+# ╟─1ba83e3d-a6f1-4b53-b5ac-a06344425504
 # ╟─a9318a66-14b0-4741-89f3-dfb7a098bdb4
 # ╠═cce178a7-aab3-47a9-9303-9482688dcee2
 # ╠═148e0f77-eb00-4562-aa94-e3f2cb4586ae
