@@ -15,13 +15,13 @@ macro bind(def, element)
 end
 
 # ╔═╡ 3ccedc11-19d9-47fc-9b0e-7cf4400264a7
-using Plots
+using Plots, Chain
 
 # ╔═╡ f74d1aa9-02d8-43d0-b4c7-3093e3b198e7
 @bind N_PLAYERS_POWER html"<input type=range min=1 max=70 value=50>"
 
 # ╔═╡ 475854a6-2bd4-4f4e-ba94-655b4259904c
-@bind N_ITERS html"<input type=range min=0 max=500 name=N_ITERS value=30>"
+@bind N_ITERS html"<input type=range min=0 max=1000 name=N_ITERS value=30>"
 
 # ╔═╡ 7137a155-64e6-48d8-9aa6-2c158272d1cb
 begin
@@ -34,6 +34,7 @@ end
 begin
 	new_Player(_=0) = (color=rand(0:2), score=0, prev=2)
 	players = map(new_Player, fill(0, N_PLAYERS))
+	# players = @chain 1:N_PLAYERS new_Player collect
 end
 
 # ╔═╡ 1ba83e3d-a6f1-4b53-b5ac-a06344425504
@@ -57,17 +58,21 @@ end
 
 # ╔═╡ 148e0f77-eb00-4562-aa94-e3f2cb4586ae
 begin
-	using Random, Chain;
+	using Random, DataFrames
 	# matchups = Random.randperm(N_PLAYERS) |> (x -> Iterators.partition(x, 2))
-	matchups = players |> shuffle |> (C -> Iterators.partition(C, 2))
+	# matchups = players |> shuffle |> (C -> Iterators.partition(C, 2))
+	matchups = @chain players shuffle Iterators.partition(2)
 
 	println("num iters: $(N_ITERS)")
 
+	total_score_history = []
+
 	for _ in 1:N_ITERS
-		# global matchups = matchups |> Iterators.flatten |> collect |> shuffle |> (C -> Iterators.partition(C, 2))	# shuffle
-		global matchups = @chain matchups Iterators.flatten collect sort(by=(p -> p.score)) Iterators.partition(2) 
+		global matchups = matchups |> Iterators.flatten |> collect |> shuffle |> (C -> Iterators.partition(C, 2))	# shuffle
+		# global matchups = @chain matchups Iterators.flatten collect sort(by=(p -> p.score)) Iterators.partition(2) 
 		
 		global matchups = matchups .|> play_match
+		@chain total_score_history push!(sum(matchups |> Iterators.flatten .|> (p -> p.score)))
 	end
 	final_scores = matchups
 	
@@ -78,11 +83,19 @@ begin
 	scores = final_scores |> Iterators.flatten .|> (p -> p.score)
 	max_score = maximum(scores)
 	println("max score: $(max_score)")
-	plot = histogram(scores,
+	plotted_hist = histogram(scores,
 		xlabel="score", ylabel="number of players", label="score distribution", title="$(N_PLAYERS) players, $(N_ITERS) rounds, reshuffle every round",
-		bins=40)
+		bins=40, opacity=0.5, linewidth=0, xrotation=30)
 		# bins=[0, 0.05, 0.1, 0.3, 0.55, 0.65, 0.7, 1, 1.05]*max_score)
-	vline!(plot, [5*N_ITERS], label="theory max score", color="green")
+
+	player_scores = @chain matchups Iterators.flatten DataFrame groupby(:color)
+	plot_data = (; [(g[1, :color] |> (i -> ["titfortat", "defect", "cooperate"][i+1]) |> Symbol, g[!, :score]) for g in player_scores]... )
+	histogram!(plot_data |> values |> collect, labels=plot_data |> keys .|> string |> collect |> permutedims, linewidth=0)
+
+	plot(plotted_hist, plot(total_score_history))
+	# scores_by_color = 0:2 .|> (@chain matchups filter(m -> ))
+	
+	# vline!(plot, [5*N_ITERS], label="theory max score", color="green")
 	# histogram!(plot, scores, bins=50, label="granular plot", alpha=0.4)
 end
 
@@ -90,11 +103,13 @@ end
 PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
 Chain = "8be319e6-bccf-4806-a6f7-6fae938471bc"
+DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 
 [compat]
 Chain = "~0.5.0"
+DataFrames = "~1.4.1"
 Plots = "~1.35.3"
 """
 
@@ -104,7 +119,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.8.0"
 manifest_format = "2.0"
-project_hash = "3f3a929a1a2101abce05a3337c379a6aa1180314"
+project_hash = "5407a79b73271fb5265b1e10bde2159182b67c41"
 
 [[deps.ArgTools]]
 uuid = "0dad84c5-d112-42e6-8d28-ef12dabb789f"
@@ -196,16 +211,32 @@ git-tree-sha1 = "d05d9e7b7aedff4e5b51a029dced05cfb6125781"
 uuid = "d38c429a-6771-53c6-b99e-75d170b6e991"
 version = "0.6.2"
 
+[[deps.Crayons]]
+git-tree-sha1 = "249fe38abf76d48563e2f4556bebd215aa317e15"
+uuid = "a8cc5b0e-0ffa-5ad4-8c14-923d3ee1735f"
+version = "4.1.1"
+
 [[deps.DataAPI]]
 git-tree-sha1 = "46d2680e618f8abd007bce0c3026cb0c4a8f2032"
 uuid = "9a962f9c-6df0-11e9-0e5d-c546b8b5ee8a"
 version = "1.12.0"
+
+[[deps.DataFrames]]
+deps = ["Compat", "DataAPI", "Future", "InvertedIndices", "IteratorInterfaceExtensions", "LinearAlgebra", "Markdown", "Missings", "PooledArrays", "PrettyTables", "Printf", "REPL", "Random", "Reexport", "SnoopPrecompile", "SortingAlgorithms", "Statistics", "TableTraits", "Tables", "Unicode"]
+git-tree-sha1 = "558078b0b78278683a7445c626ee78c86b9bb000"
+uuid = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
+version = "1.4.1"
 
 [[deps.DataStructures]]
 deps = ["Compat", "InteractiveUtils", "OrderedCollections"]
 git-tree-sha1 = "d1fff3a548102f48987a52a2e0d114fa97d730f0"
 uuid = "864edb3b-99cc-5e75-8d2d-829cb0a9cfe8"
 version = "0.18.13"
+
+[[deps.DataValueInterfaces]]
+git-tree-sha1 = "bfc1187b79289637fa0ef6d4436ebdfe6905cbd6"
+uuid = "e2d170a0-9d28-54be-80f0-106bbe20a464"
+version = "1.0.0"
 
 [[deps.Dates]]
 deps = ["Printf"]
@@ -277,6 +308,10 @@ git-tree-sha1 = "aa31987c2ba8704e23c6c8ba8a4f769d5d7e4f91"
 uuid = "559328eb-81f9-559d-9380-de523a88c83c"
 version = "1.0.10+0"
 
+[[deps.Future]]
+deps = ["Random"]
+uuid = "9fa8497b-333b-5362-9e8d-4d0656e87820"
+
 [[deps.GLFW_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Libglvnd_jll", "Pkg", "Xorg_libXcursor_jll", "Xorg_libXi_jll", "Xorg_libXinerama_jll", "Xorg_libXrandr_jll"]
 git-tree-sha1 = "d972031d28c8c8d9d7b41a536ad7bb0c2579caca"
@@ -345,10 +380,20 @@ git-tree-sha1 = "49510dfcb407e572524ba94aeae2fced1f3feb0f"
 uuid = "3587e190-3f89-42d0-90ee-14403ec27112"
 version = "0.1.8"
 
+[[deps.InvertedIndices]]
+git-tree-sha1 = "bee5f1ef5bf65df56bdd2e40447590b272a5471f"
+uuid = "41ab1584-1d38-5bbf-9106-f11c6c58b48f"
+version = "1.1.0"
+
 [[deps.IrrationalConstants]]
 git-tree-sha1 = "7fd44fd4ff43fc60815f8e764c0f352b83c49151"
 uuid = "92d709cd-6900-40b7-9082-c6be49f344b6"
 version = "0.1.1"
+
+[[deps.IteratorInterfaceExtensions]]
+git-tree-sha1 = "a3f24677c21f5bbe9d2a714f95dcd58337fb2856"
+uuid = "82899510-4779-5014-852e-03e436cf321d"
+version = "1.0.0"
 
 [[deps.JLFzf]]
 deps = ["Pipe", "REPL", "Random", "fzf_jll"]
@@ -631,11 +676,23 @@ git-tree-sha1 = "524d9ff1b2f4473fef59678c06f9f77160a204b1"
 uuid = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
 version = "1.35.3"
 
+[[deps.PooledArrays]]
+deps = ["DataAPI", "Future"]
+git-tree-sha1 = "a6062fe4063cdafe78f4a0a81cfffb89721b30e7"
+uuid = "2dfb63ee-cc39-5dd5-95bd-886bf059d720"
+version = "1.4.2"
+
 [[deps.Preferences]]
 deps = ["TOML"]
 git-tree-sha1 = "47e5f437cc0e7ef2ce8406ce1e7e24d44915f88d"
 uuid = "21216c6a-2e73-6563-6e65-726566657250"
 version = "1.3.0"
+
+[[deps.PrettyTables]]
+deps = ["Crayons", "Formatting", "Markdown", "Reexport", "StringManipulation", "Tables"]
+git-tree-sha1 = "460d9e154365e058c4d886f6f7d6df5ffa1ea80e"
+uuid = "08abe8d2-0d0c-5749-adfa-8a2ac140af0d"
+version = "2.1.2"
 
 [[deps.Printf]]
 deps = ["Unicode"]
@@ -748,10 +805,27 @@ git-tree-sha1 = "d1bf48bfcc554a3761a133fe3a9bb01488e06916"
 uuid = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 version = "0.33.21"
 
+[[deps.StringManipulation]]
+git-tree-sha1 = "46da2434b41f41ac3594ee9816ce5541c6096123"
+uuid = "892a3eda-7b42-436c-8928-eab12a02cf0e"
+version = "0.3.0"
+
 [[deps.TOML]]
 deps = ["Dates"]
 uuid = "fa267f1f-6049-4f14-aa54-33bafae1ed76"
 version = "1.0.0"
+
+[[deps.TableTraits]]
+deps = ["IteratorInterfaceExtensions"]
+git-tree-sha1 = "c06b2f539df1c6efa794486abfb6ed2022561a39"
+uuid = "3783bdb8-4a98-5b6b-af9a-565f29a5fe9c"
+version = "1.0.1"
+
+[[deps.Tables]]
+deps = ["DataAPI", "DataValueInterfaces", "IteratorInterfaceExtensions", "LinearAlgebra", "OrderedCollections", "TableTraits", "Test"]
+git-tree-sha1 = "c79322d36826aa2f4fd8ecfa96ddb47b174ac78d"
+uuid = "bd369af6-aec1-5ad0-b16a-f7cc5008161c"
+version = "1.10.0"
 
 [[deps.Tar]]
 deps = ["ArgTools", "SHA"]
@@ -1033,8 +1107,8 @@ version = "1.4.1+0"
 # ╠═f74d1aa9-02d8-43d0-b4c7-3093e3b198e7
 # ╠═475854a6-2bd4-4f4e-ba94-655b4259904c
 # ╟─7137a155-64e6-48d8-9aa6-2c158272d1cb
-# ╟─19bf098e-6635-4e45-9edc-9ae527c8c97d
-# ╟─1ba83e3d-a6f1-4b53-b5ac-a06344425504
+# ╠═19bf098e-6635-4e45-9edc-9ae527c8c97d
+# ╠═1ba83e3d-a6f1-4b53-b5ac-a06344425504
 # ╟─a9318a66-14b0-4741-89f3-dfb7a098bdb4
 # ╠═148e0f77-eb00-4562-aa94-e3f2cb4586ae
 # ╟─00000000-0000-0000-0000-000000000001
