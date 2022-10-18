@@ -57,14 +57,16 @@ end
 
 # ╔═╡ 148e0f77-eb00-4562-aa94-e3f2cb4586ae
 begin
-	using Random;
+	using Random, Chain;
 	# matchups = Random.randperm(N_PLAYERS) |> (x -> Iterators.partition(x, 2))
 	matchups = players |> shuffle |> (C -> Iterators.partition(C, 2))
 
 	println("num iters: $(N_ITERS)")
 
 	for _ in 1:N_ITERS
-		global matchups = matchups |> Iterators.flatten |> collect |> shuffle |> (C -> Iterators.partition(C, 2))
+		# global matchups = matchups |> Iterators.flatten |> collect |> shuffle |> (C -> Iterators.partition(C, 2))	# shuffle
+		global matchups = @chain matchups Iterators.flatten collect sort(by=(p -> p.score)) Iterators.partition(2) 
+		
 		global matchups = matchups .|> play_match
 	end
 	final_scores = matchups
@@ -87,10 +89,12 @@ end
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
+Chain = "8be319e6-bccf-4806-a6f7-6fae938471bc"
 Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 
 [compat]
+Chain = "~0.5.0"
 Plots = "~1.35.3"
 """
 
@@ -100,7 +104,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.8.0"
 manifest_format = "2.0"
-project_hash = "ca8ccb35183a46156182663e3d031923ad0ef12a"
+project_hash = "3f3a929a1a2101abce05a3337c379a6aa1180314"
 
 [[deps.ArgTools]]
 uuid = "0dad84c5-d112-42e6-8d28-ef12dabb789f"
@@ -128,6 +132,11 @@ deps = ["Artifacts", "Bzip2_jll", "Fontconfig_jll", "FreeType2_jll", "Glib_jll",
 git-tree-sha1 = "4b859a208b2397a7a623a03449e4636bdb17bcf2"
 uuid = "83423d85-b0ee-5818-9007-b63ccbeb887a"
 version = "1.16.1+1"
+
+[[deps.Chain]]
+git-tree-sha1 = "8c4920235f6c561e401dfe569beb8b924adad003"
+uuid = "8be319e6-bccf-4806-a6f7-6fae938471bc"
+version = "0.5.0"
 
 [[deps.ChainRulesCore]]
 deps = ["Compat", "LinearAlgebra", "SparseArrays"]
