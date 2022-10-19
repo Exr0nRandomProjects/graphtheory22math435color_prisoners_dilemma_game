@@ -68,8 +68,8 @@ begin
 	total_score_history = []
 
 	for _ in 1:N_ITERS
-		global matchups = matchups |> Iterators.flatten |> collect |> shuffle |> (C -> Iterators.partition(C, 2))	# shuffle
-		# global matchups = @chain matchups Iterators.flatten collect sort(by=(p -> p.score)) Iterators.partition(2) 
+		# global matchups = matchups |> Iterators.flatten |> collect |> shuffle |> (C -> Iterators.partition(C, 2))	# shuffle
+		global matchups = @chain matchups Iterators.flatten collect sort(by=(p -> p.score)) Iterators.partition(2) 
 		
 		global matchups = matchups .|> play_match
 		@chain total_score_history push!(sum(matchups |> Iterators.flatten .|> (p -> p.score)))
@@ -85,14 +85,14 @@ begin
 	println("max score: $(max_score)")
 	plotted_hist = histogram(scores,
 		xlabel="score", ylabel="number of players", label="score distribution", title="$(N_PLAYERS) players, $(N_ITERS) rounds, reshuffle every round",
-		bins=40, opacity=0.5, linewidth=0, xrotation=30)
+		bins=40, opacity=0.1, linewidth=0, xrotation=30)
 		# bins=[0, 0.05, 0.1, 0.3, 0.55, 0.65, 0.7, 1, 1.05]*max_score)
 
 	player_scores = @chain matchups Iterators.flatten DataFrame groupby(:color)
 	plot_data = (; [(g[1, :color] |> (i -> ["titfortat", "defect", "cooperate"][i+1]) |> Symbol, g[!, :score]) for g in player_scores]... )
-	histogram!(plot_data |> values |> collect, labels=plot_data |> keys .|> string |> collect |> permutedims, linewidth=0)
+	histogram!(plot_data |> values |> collect, labels=plot_data |> keys .|> string |> collect |> permutedims, linewidth=0, opacity=0.7, bins=60)
 
-	plot(plotted_hist, plot(total_score_history))
+	# plot(plotted_hist, plot(total_score_history))
 	# scores_by_color = 0:2 .|> (@chain matchups filter(m -> ))
 	
 	# vline!(plot, [5*N_ITERS], label="theory max score", color="green")
