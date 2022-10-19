@@ -15,29 +15,31 @@ macro bind(def, element)
 end
 
 # ╔═╡ 3ccedc11-19d9-47fc-9b0e-7cf4400264a7
-using Chain
+using Chain, StatsPlots, PlutoUI
 
 # ╔═╡ f74d1aa9-02d8-43d0-b4c7-3093e3b198e7
-@bind N_PLAYERS_POWER html"<input type=range min=1 max=70 value=50>"
-
-# ╔═╡ 475854a6-2bd4-4f4e-ba94-655b4259904c
-@bind N_ITERS html"<input type=range min=0 max=100 name=N_ITERS value=30>"
+md"""
+- Number of players: 1.2 ^ $(@bind N_PLAYERS_POWER Slider(1:70))
+- Number of rounds: 1.2 ^ $(@bind N_ITERS_POWER Slider(1:40))
+"""
 
 # ╔═╡ 7137a155-64e6-48d8-9aa6-2c158272d1cb
 begin
 	N_PLAYERS = floor(Int, 1.2^N_PLAYERS_POWER)
 	N_PLAYERS += isodd(N_PLAYERS) ? 1 : 0
-	print("number of players: $(N_PLAYERS)")
+	N_ITERS = floor(Int, 1.2^N_ITERS_POWER)-1
+	nothing
 end
 
 # ╔═╡ 19bf098e-6635-4e45-9edc-9ae527c8c97d
 begin
 	new_Player(_=0) = (color=rand(0:2), score=0, prev=2)
 	players = 1:N_PLAYERS .|> new_Player |> collect
+	nothing
 end
 
-# ╔═╡ 1ba83e3d-a6f1-4b53-b5ac-a06344425504
-# histogram(map(x -> x.color, players), bins=3, xlabel="color/strategy", ylabel="# of players", label="players")
+# ╔═╡ f6e580f2-6cc7-4c2e-b0c2-d3b25482f16b
+md"""Show distribution histogram? $(@bind show_players_hist CheckBox())"""
 
 # ╔═╡ a9318a66-14b0-4741-89f3-dfb7a098bdb4
 begin
@@ -58,49 +60,39 @@ end
 # ╔═╡ 148e0f77-eb00-4562-aa94-e3f2cb4586ae
 begin
 	using Random, DataFrames
-	using StatsPlots
-	# matchups = Random.randperm(N_PLAYERS) |> (x -> Iterators.partition(x, 2))
-	# matchups = players |> shuffle |> (C -> Iterators.partition(C, 2))
 	matchups = @chain players shuffle Iterators.partition(2)
 
-	println("num iters: $(N_ITERS)")
+	# println("num iters: $(N_ITERS)")
 
 	total_score_history = []
 
 	for _ in 1:N_ITERS
 		global matchups = matchups |> Iterators.flatten |> collect |> shuffle |> (C -> Iterators.partition(C, 2))	# shuffle
-		# global matchups = @chain matchups Iterators.flatten collect sort(by=(p -> p.score)) Iterators.partition(2) 
+		# global matchups = @chain matchups Iterators.flatten collect sort(by=(p -> p.score)) Iterators.partition(2) # sort
 		
 		global matchups = matchups .|> play_match
 		@chain total_score_history push!(sum(matchups |> Iterators.flatten .|> (p -> p.score)))
 	end
 	final_scores = matchups
-	
-	# using Memoize
-	# @memoize recursive_sim(n_iter) = n_iter == 0 ? matchups : recursive_sim(n_iter-1) .|> play_match
-	# final_scores = recursive_sim(N_ITERS)
+
 
 	df = final_scores |> Iterators.flatten |> DataFrame
-	# @df df histogram(:score, group=(:color))
-	@df df groupedhist(:score, group=(:color), bar_position=:stack, bins=40, title="$(N_PLAYERS) players, $(N_ITERS) rounds, reshuffle each")
+	@df df groupedhist(:score, group=(:color),
+		labels=["titfortat" "defect" "cooperate"], color=["blue" "red" "green"], 
+		title="$(N_PLAYERS) players, $(N_ITERS) rounds, reshuffle each",
+		bar_position=:stack, bins=40,
+		)
+end
 
-	# scores = final_scores |> Iterators.flatten .|> (p -> p.score)
-	# max_score = maximum(scores)
-	# println("max score: $(max_score)")
-	# # plotted_hist = histogram(scores,
-	# # 	xlabel="score", ylabel="number of players", label="score distribution", title="$(N_PLAYERS) players, $(N_ITERS) rounds, reshuffle every round",
-	# # 	bins=40, opacity=0.1, linewidth=0, xrotation=30)
-	# 	# bins=[0, 0.05, 0.1, 0.3, 0.55, 0.65, 0.7, 1, 1.05]*max_score)
-
-	# player_scores = @chain matchups Iterators.flatten DataFrame groupby(:color)
-	# plot_data = (; [(g[1, :color] |> (i -> ["titfortat", "defect", "cooperate"][i+1]) |> Symbol, g[!, :score]) for g in player_scores]... )
-	# histogram!(plot_data |> values |> collect, labels=plot_data |> keys .|> string |> collect |> permutedims, linewidth=0, opacity=0.7, bins=100)
-
-	# plot(plotted_hist, plot(total_score_history))
-	# scores_by_color = 0:2 .|> (@chain matchups filter(m -> ))
-	
-	# vline!(plot, [5*N_ITERS], label="theory max score", color="green")
-	# histogram!(plot, scores, bins=50, label="granular plot", alpha=0.4)
+# ╔═╡ 1ba83e3d-a6f1-4b53-b5ac-a06344425504
+if show_players_hist 
+	@chain players begin
+		DataFrame
+		groupby(:color)
+		combine(nrow)
+		insertcols(1, :name => ["titfortat", "defect", "cooperate"], :display_color => ["blue", "red", "green"])
+		@df _ bar(:nrow, group=:name, label=:name, color=:display_color)
+	end
 end
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
@@ -108,12 +100,14 @@ PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
 Chain = "8be319e6-bccf-4806-a6f7-6fae938471bc"
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
+PlutoUI = "7f904dfe-b85e-4ff6-b463-dae2292396a8"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 StatsPlots = "f3b207a7-027a-5e70-b257-86293d7955fd"
 
 [compat]
 Chain = "~0.5.0"
 DataFrames = "~1.4.1"
+PlutoUI = "~0.7.44"
 StatsPlots = "~0.15.4"
 """
 
@@ -123,13 +117,19 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.8.0"
 manifest_format = "2.0"
-project_hash = "7d384aeec2a439815c9f259748b8391a4a667603"
+project_hash = "dd8664e5fc8729cbc806299a20a9eedf1a27d12f"
 
 [[deps.AbstractFFTs]]
 deps = ["ChainRulesCore", "LinearAlgebra"]
 git-tree-sha1 = "69f7020bd72f069c219b5e8c236c1fa90d2cb409"
 uuid = "621f4979-c628-5d54-868e-fcf4e3e8185c"
 version = "1.2.1"
+
+[[deps.AbstractPlutoDingetjes]]
+deps = ["Pkg"]
+git-tree-sha1 = "8eaf9f1b4921132a4cff3f36a1d9ba923b14a481"
+uuid = "6e696c72-6542-2067-7265-42206c756150"
+version = "1.1.4"
 
 [[deps.Adapt]]
 deps = ["LinearAlgebra"]
@@ -468,6 +468,24 @@ deps = ["DualNumbers", "LinearAlgebra", "OpenLibm_jll", "SpecialFunctions", "Tes
 git-tree-sha1 = "709d864e3ed6e3545230601f94e11ebc65994641"
 uuid = "34004b35-14d8-5ef3-9330-4cdb6864b03a"
 version = "0.3.11"
+
+[[deps.Hyperscript]]
+deps = ["Test"]
+git-tree-sha1 = "8d511d5b81240fc8e6802386302675bdf47737b9"
+uuid = "47d2ed2b-36de-50cf-bf87-49c2cf4b8b91"
+version = "0.0.4"
+
+[[deps.HypertextLiteral]]
+deps = ["Tricks"]
+git-tree-sha1 = "c47c5fa4c5308f27ccaac35504858d8914e102f9"
+uuid = "ac1192a8-f4b3-4bfe-ba22-af5b92cd3ab2"
+version = "0.9.4"
+
+[[deps.IOCapture]]
+deps = ["Logging", "Random"]
+git-tree-sha1 = "f7be53659ab06ddc986428d3a9dcc95f6fa6705a"
+uuid = "b5f81e59-6552-4d32-b1f0-c071b021bf89"
+version = "0.2.2"
 
 [[deps.IniFile]]
 git-tree-sha1 = "f550e6e32074c939295eb5ea6de31849ac2c9625"
@@ -837,6 +855,12 @@ git-tree-sha1 = "524d9ff1b2f4473fef59678c06f9f77160a204b1"
 uuid = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
 version = "1.35.3"
 
+[[deps.PlutoUI]]
+deps = ["AbstractPlutoDingetjes", "Base64", "ColorTypes", "Dates", "Hyperscript", "HypertextLiteral", "IOCapture", "InteractiveUtils", "JSON", "Logging", "Markdown", "Random", "Reexport", "UUIDs"]
+git-tree-sha1 = "6e33d318cf8843dade925e35162992145b4eb12f"
+uuid = "7f904dfe-b85e-4ff6-b463-dae2292396a8"
+version = "0.7.44"
+
 [[deps.PooledArrays]]
 deps = ["DataAPI", "Future"]
 git-tree-sha1 = "a6062fe4063cdafe78f4a0a81cfffb89721b30e7"
@@ -1075,6 +1099,11 @@ deps = ["Random", "Test"]
 git-tree-sha1 = "8a75929dcd3c38611db2f8d08546decb514fcadf"
 uuid = "3bb67fe8-82b1-5028-8e26-92a6c54297fa"
 version = "0.9.9"
+
+[[deps.Tricks]]
+git-tree-sha1 = "6bac775f2d42a611cdfcd1fb217ee719630c4175"
+uuid = "410a4b4d-49e4-4fbc-ab6d-cb71b17b3775"
+version = "0.1.6"
 
 [[deps.URIs]]
 git-tree-sha1 = "e59ecc5a41b000fa94423a578d29290c7266fc10"
@@ -1343,13 +1372,13 @@ version = "1.4.1+0"
 """
 
 # ╔═╡ Cell order:
-# ╠═3ccedc11-19d9-47fc-9b0e-7cf4400264a7
-# ╠═f74d1aa9-02d8-43d0-b4c7-3093e3b198e7
-# ╠═475854a6-2bd4-4f4e-ba94-655b4259904c
+# ╟─3ccedc11-19d9-47fc-9b0e-7cf4400264a7
+# ╟─f74d1aa9-02d8-43d0-b4c7-3093e3b198e7
 # ╟─7137a155-64e6-48d8-9aa6-2c158272d1cb
 # ╟─19bf098e-6635-4e45-9edc-9ae527c8c97d
-# ╠═1ba83e3d-a6f1-4b53-b5ac-a06344425504
+# ╟─f6e580f2-6cc7-4c2e-b0c2-d3b25482f16b
+# ╟─1ba83e3d-a6f1-4b53-b5ac-a06344425504
 # ╟─a9318a66-14b0-4741-89f3-dfb7a098bdb4
-# ╠═148e0f77-eb00-4562-aa94-e3f2cb4586ae
+# ╟─148e0f77-eb00-4562-aa94-e3f2cb4586ae
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
